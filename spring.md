@@ -10,6 +10,8 @@
 
 Spring 最核心的思想就是不重新造轮子，开箱即用，提高开发效率。
 
+
+
 ### 模块
 
 Spring 各个模块的依赖关系如下：
@@ -48,74 +50,160 @@ Spring 各个模块的依赖关系如下：
 
 
 
-### 事务
+### 配置文件
 
-#### 事务机制
+#### 多附件
 
-- spring支持编程式事务管理和声明式事务管理两种方式：
-  - 编程式事务管理使用TransactionTemplate
-    或者直接使用底层的PlatformTransactionManager
-    spring推荐使用TransactionTemplate
-  - 声明式事务管理建立在AOP之上的
-    其本质是对方法前后进行拦截 然后在目标方法开始之前创建或者加入一个事务
-    声明式事务管理也有两种常用的方式：
-    - `基于tx和aop名字空间的xml配置文`件
-    - 基于`@Transactional`注解
+文件名可以按照 application-{profile}.yml 的格式编辑
+![image-20230819131826516](spring.assets/image-20230819131826516.png)
 
-spring所有的事务管理策略类都继承自org.springframework.transaction.PlatformTransactionManager接口
-@Transactional 注解应该只被应用到public方法上  这是由Spring AOP的本质决定的
-只有来自外部的方法调用才会被AOP代理捕获，也就是，类内部方法调用本类内部的其他方法并不会引起事务行为，即使被调用方法使用@Transactional注解进行修饰
+~~~yaml
+# 在application.yaml中指定环境
+spring:
+  profiles:
+    active: dev
+~~~
 
+#### 文档块
 
+通过---可以把一个yml文档分割为多个
+并可以通过 spring.profiles.active 属性指定使用哪个配置文件
 
-#### 注解开发
+~~~yaml
+server:
+  port: 8081
+spring:
+  profiles:
+    active: prod #指定使用哪个环境
 
-spring 的事务管理 其实也就是对数据库事务功能的支持
-直接在类或方法上添加 @Transactional() 注解 即可实现注解开启
-需要注意的是：
+---
+server:
+  port: 8083
+spring:
+  profiles: dev  #指定属于哪个环境
 
-- 如果被注解的数据库操作方法中发生了unchecked异常  所有的数据库操作将rollback
-- 如果发生的异常是checked异常  默认情况下数据库操作还是会提交的
-
-最重要的是  要理解spring事务管理的机制：`使用AOP在需要事务管理的方法前后添加事务开启关闭提交的逻辑`  明白了这个逻辑 也就能理解spring的事务机制
-
-
-
-#### 传播机制
-
-- PROPAGATION_REQUIRED —— 支持当前事务，如果当前没有事务，则新建一个事务，这是最常见的选择，也是 Spring 默认的一个事务传播属性。
-- PROPAGATION_SUPPORTS —— 支持当前事务，如果当前没有事务，则以非事务方式执行。
-- PROPAGATION_MANDATORY —— 支持当前事务，如果当前没有事务，则抛出异常。
-- PROPAGATION_REQUIRES_NEW —— 新建事务，如果当前存在事务，把当前事务挂起。
-- PROPAGATION_NOT_SUPPORTED —— 以非事务方式执行操作，如果当前存在事务，就把当前事务挂起。
-- PROPAGATION_NEVER —— 以非事务方式执行，如果当前存在事务，则抛出异常。
-- PROPAGATION_NESTED —— Nested的事务和它的**父事务**是相依的，它的提交是要等和它的父事务一块提交的。
+---
+server:
+  port: 8084
+spring:
+  profiles: prod  #指定属于哪个环境
+~~~
 
 
 
-#### 隔离级别
+#### 优先级
 
-1、ISOLATION_DEFAULT
-这是一个 PlatfromTransactionManager 默认的隔离级别，使用数据库默认的事务隔离级别。
-以下4个与 JDBC 的隔离级别相对应。
-
-2、ISOLATION_READ_UNCOMMITTED
-这是事务最低的隔离级别，它允许另外一个事务可以看到这个事务未提交的数据。
-这种隔离级别会产生脏读，不可重复读和幻读。
-
-3、 ISOLATION_READ_COMMITTED
-保证一个事务修改的数据提交后才能被另外一个事务读取，其它事务不能读取该事务未提交的数据。
-这种事务隔离级别可以避免脏读出现，但是可能会出现不可重复读和幻像读。
-
-4、ISOLATION_REPEATABLE_READ
-保证一个事务不能读取另一个事务未提交的数据，避免了“脏读取”和“不可重复读取”的情况，但是带来了更多的性能损失。
-这种事务隔离级别可以防止脏读，不可重复读，但是可能出现幻读。
-
-5、ISOLATION_SERIALIZABLE
-这是最可靠的但是代价花费最高的事务隔离级别，事务被处理为顺序执行。
-除了可防止脏读，不可重复读外，还避免了幻读。
+![image-20230819150509599](spring.assets/image-20230819150509599.png)
 
 
+
+
+
+### 定时任务
+
+- 首先要在启动类上加上`@EnableScheduling`注解
+- 在spring中使用 `@Scheduled` 注解创建定时任务 通过cron表达式指定定时规则
+
+默认情况下，**`@Scheduled`任务都在Spring创建的大小为1的默认线程池中执行**
+
+
+
+
+
+### 过滤器
+
+- 实现javax.Servlet.Filter接口
+
+  ~~~java
+  public interface Filter {  
+     //初始化过滤器后执行的操作
+      default void init(FilterConfig filterConfig) throws ServletException {
+      }
+     // 对请求进行过滤
+      void doFilter(ServletRequest var1, ServletResponse var2, FilterChain var3) throws IOException, ServletException;
+     // 销毁过滤器后执行的操作，主要用户对某些资源的回收
+      default void destroy() {
+      }
+  }
+  ~~~
+
+- 在配置中注册自定义的过滤器
+
+  ```java
+  @Configuration
+  public class MyFilterConfig {
+      @Autowired
+      MyFilter myFilter;
+      @Bean
+      public FilterRegistrationBean<MyFilter> thirdFilter() {
+          FilterRegistrationBean<MyFilter> filterRegistrationBean = new FilterRegistrationBean<>();
+  
+          filterRegistrationBean.setFilter(myFilter);
+  
+          filterRegistrationBean.setUrlPatterns(new ArrayList<>(Arrays.asList("/api/*")));
+  
+          return filterRegistrationBean;
+      }
+  }
+  ```
+
+- 通过`@WebFilter`注解实现注册
+
+  ```java
+  @WebFilter(filterName = "MyFilterWithAnnotation", urlPatterns = "/api/*")
+  public class MyFilterWithAnnotation implements Filter {
+  }
+  ```
+
+
+
+
+
+### 拦截器
+
+1. 自定义 Interceptor ：
+
+   - 实现 **org.springframework.web.servlet.HandlerInterceptor**接口
+
+   - 继承 **org.springframework.web.servlet.handler.HandlerInterceptorAdapter**类
+
+2. 实现 preHandle、postHandle、afterCompletion 三个方法
+   ![image-20230819152549732](spring.assets/image-20230819152549732.png)
+
+3. 配置拦截器
+
+   ```java
+   @Configuration
+   public class WebConfig implements WebMvcConfigurer {
+       @Override
+       public void addInterceptors(InterceptorRegistry registry) {
+           registry.addInterceptor(new LogInterceptor());
+           registry.addInterceptor(new OldLoginInterceptor())
+                   .addPathPatterns("/admin/oldLogin");
+           registry.addInterceptor(new AdminInterceptor())
+                   .addPathPatterns("/admin/*")
+                   .excludePathPatterns("/admin/oldLogin");
+       }
+   }
+   ```
+
+
+
+
+
+
+
+
+
+### 设计模式
+
+- **工厂设计模式** : Spring 使用工厂模式通过 `BeanFactory`、`ApplicationContext` 创建 bean 对象。
+- **代理设计模式** : Spring AOP 功能的实现。
+- **单例设计模式** : Spring 中的 Bean 默认都是单例的。
+- **模板方法模式** : Spring 中 `jdbcTemplate`、`hibernateTemplate` 等以 Template 结尾的对数据库操作的类，它们就使用到了模板模式。
+- **包装器设计模式** : 我们的项目需要连接多个数据库，而且不同的客户在每次访问中根据需要会去访问不同的数据库。这种模式让我们可以根据客户的需求能够动态切换不同的数据源。
+- **观察者模式:** Spring 事件驱动模型就是观察者模式很经典的一个应用。
+- **适配器模式** : Spring AOP 的增强或通知(Advice)使用到了适配器模式、spring MVC 中也是用到了适配器模式适配`Controller`。
 
 
 
@@ -150,12 +238,14 @@ spring 的事务管理 其实也就是对数据库事务功能的支持
 6. @Configuration：
 
    1. `Spring的官方团队说@Component可以替代@Configuration注解`  查看源码可知
-   2. 虽说在代码逻辑上组件注解可以代替配置注解  但是实际上 我们在标有配置注解的类中对 对象定义实例、配置和初始化逻辑
+   2. 虽说在代码逻辑上组件注解可以代替配置注解  但是实际上 我们在标有配置注解的类中 会有对象定义实例、配置和初始化逻辑
    3. 视图解析器AOP事务管理器之类.... 在配置类中管理的基本都是第三方的类
 
 7. @Bean：
 
    bean注解基本作用于方法之上 用来处理第三方的类  一般是在配置类中处理 一些特定的第三方类  如视图解析、事务管理、监听等等...
+   
+8. @Scope：声明 Bean 的作用域
 
 
 
@@ -192,6 +282,38 @@ spring 的事务管理 其实也就是对数据库事务功能的支持
 6. @ResponseBody： 作用是将返回类型直接输入到HTTP response body中 `@ResponseBody在输出JSON格式的数据时 会经常用到`
 7. @RestController： 控制器实现了REST的API 只为服务于JSON，XML或其它自定义的类型内容
 8. @ModelAttribute：
+
+
+
+### Spring Boot注解
+
+1. @SpringBootApplication：可以看作是 `@Configuration`、`@EnableAutoConfiguration`、`@ComponentScan` 注解的集合
+
+   1. `@EnableAutoConfiguration`：启用 SpringBoot 的自动配置机制
+   2. `@ComponentScan`：扫描被`@Component` (`@Repository`,`@Service`,`@Controller`)注解的 bean，注解默认会扫描该类所在的包下所有的类。
+   3. `@Configuration`：等价 @Component
+
+2. @ConfigurationProperties：通过`@ConfigurationProperties`读取配置文件并与 bean 绑定
+
+   ~~~java
+   @Data
+   @Component
+   @ConfigurationProperties(prefix = "vincent")
+   public class VincentProperties {
+       String id;
+       String name;
+       String msg;
+   }
+   ~~~
+
+   ~~~yaml
+   vincent:
+     id: 123
+     name: vincent
+     msg: hello world
+   ~~~
+
+   
 
 
 
@@ -253,6 +375,150 @@ spring 的事务管理 其实也就是对数据库事务功能的支持
 - 当要销毁 Bean 的时候，如果 Bean 在配置文件中的定义包含 destroy-method 属性，执行指定的方法。
 
 ![image-20230818172623879](spring.assets/image-20230818172623879.png)
+
+
+
+
+
+
+
+## 事务模型
+
+### 事务机制
+
+- spring支持编程式事务管理和声明式事务管理两种方式：
+  - 编程式事务管理：使用TransactionTemplate、TransactionManager直接手动管理事务
+    spring推荐使用TransactionTemplate但是在实际开发中比较少使用 只是方便理解spring的事务管理原理
+  - 声明式事务管理：建立在AOP之上 通过AOP实现
+    本质就是对方法前后进行拦截 然后在目标方法开始之前创建或者加入一个事务
+    声明式事务管理也有两种常用的方式：
+    - `基于tx和aop名字空间的xml配置文`件
+    - 基于`@Transactional`注解
+
+spring所有的事务管理策略类都继承自PlatformTransactionManager接口
+@Transactional 注解应该只被应用到public方法上  这是由Spring AOP决定的
+只有来自外部的方法调用才会被AOP代理捕获 也就是类内部方法调用本类内部的其他方法并不会引起事务行为 即使被调用方法使用@Transactional注解进行修饰
+
+
+
+### 注解开发
+
+spring的事务管理 其实也就是对数据库事务功能的支持
+直接在类或方法上添加 @Transactional注解 即可实现注解开启
+需要注意的是：
+
+- 如果被注解的数据库操作方法中发生了unchecked异常  所有的数据库操作将rollback
+- 如果发生的异常是checked异常  默认情况下数据库操作还是会提交的（也就是try-cach）
+
+最重要的是  要理解spring事务管理的机制：`使用AOP在需要事务管理的方法前后添加事务开启关闭提交的逻辑`  明白了这个逻辑 也就能理解spring的事务机制
+
+
+
+### 传播机制
+
+理解：我认为没必要去记住详细的每一种传播类型
+只需要理解传播类型的作用就行：事务的传播就是指spring事务的作用范围
+事务传播行为是为了解决业务层方法之间互相调用的事务问题
+
+另外记住spring默认的事务传播级别是PROPAGATION_REQUIRED
+
+- PROPAGATION_REQUIRED：支持当前事务，如果当前没有事务，则新建一个事务，这是最常见的选择，也是 Spring 默认的一个事务传播属性。
+- PROPAGATION_SUPPORTS：支持当前事务，如果当前没有事务，则以非事务方式执行。
+- PROPAGATION_MANDATORY：支持当前事务，如果当前没有事务，则抛出异常。
+- PROPAGATION_REQUIRES_NEW：新建事务，如果当前存在事务，把当前事务挂起。
+- PROPAGATION_NOT_SUPPORTED：以非事务方式执行操作，如果当前存在事务，就把当前事务挂起。
+- PROPAGATION_NEVER：以非事务方式执行，如果当前存在事务，则抛出异常。
+- PROPAGATION_NESTED：Nested的事务和它的**父事务**是相依的，它的提交是要等和它的父事务一块提交的。
+
+
+
+### 隔离级别
+
+理解：spring的事务隔离级别有五种 第一种也是默认的 是直接使用数据库的隔离级别
+另外的四种对应数据库的四种隔离级别
+
+1、ISOLATION_DEFAULT
+这是一个 PlatfromTransactionManager 默认的隔离级别 使用数据库默认的事务隔离级别
+以下4个与 JDBC 的隔离级别相对应
+
+2、ISOLATION_READ_UNCOMMITTED
+这是事务最低的隔离级别，它允许另外一个事务可以看到这个事务未提交的数据。
+这种隔离级别会产生脏读，不可重复读和幻读。
+
+3、 ISOLATION_READ_COMMITTED
+保证一个事务修改的数据提交后才能被另外一个事务读取，其它事务不能读取该事务未提交的数据。
+这种事务隔离级别可以避免脏读出现，但是可能会出现不可重复读和幻像读。
+
+4、ISOLATION_REPEATABLE_READ
+保证一个事务不能读取另一个事务未提交的数据，避免了“脏读取”和“不可重复读取”的情况，但是带来了更多的性能损失。
+这种事务隔离级别可以防止脏读，不可重复读，但是可能出现幻读。
+
+5、ISOLATION_SERIALIZABLE
+这是最可靠的但是代价花费最高的事务隔离级别，事务被处理为顺序执行。
+除了可防止脏读，不可重复读外，还避免了幻读。
+
+
+
+
+
+## 日志体系
+
+
+
+
+
+## 事件模型
+
+#### 实现逻辑
+
+1. 定义一个事件: 实现一个继承自 `ApplicationEvent`，并且写相应的构造函数；
+2. 定义一个事件监听者：实现 `ApplicationListener` 接口，重写 `onApplicationEvent()` 方法；
+3. 使用事件发布者发布消息: 可以通过 `ApplicationEventPublisher` 的 `publishEvent()` 方法发布消息。
+
+
+
+#### 代码实现
+
+具体实例参考代码
+
+~~~java
+// 事件
+public class DemoEvent extends ApplicationEvent {
+    private static final long serialVersionUID = 1L;
+    private String message;
+    public DemoEvent(Object source, String message) {
+        super(source);
+        this.message = message;
+    }
+    public String getMessage() {
+        return message;
+    }
+}
+
+// 事件监听者
+@Component
+public class DemoListener implements ApplicationListener<DemoEvent> {
+    //使用onApplicationEvent接收消息
+    @Override
+    public void onApplicationEvent(DemoEvent event) {
+        String msg = event.getMessage();
+        System.out.println("接收到的信息是：" + msg);
+    }
+
+}
+
+// 发布事件
+public class DemoPublisher {
+    @Autowired
+    ApplicationContext applicationContext;
+    public void publish(String message) {
+        //发布事件
+        applicationContext.publishEvent(new DemoEvent(this, message));
+    }
+}
+~~~
+
+
 
 
 
@@ -859,6 +1125,22 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 
 ### Spring
 
+#### Spring启动流程
+
+> 因为不同的启动器启动流程稍有不同 我看的是annotation的启动
+> 一进去看到三个方法 this register refresh
+>
+> - this 是构造函数 先调用的是他父级构造函数
+>   在它的父级构造函数里面构造了一个beanfactory
+>   然后在它本身的一个无参构造函数里面 构造了一个bean读取器和一个类路径扫描器
+>   this方法很简单 就是创建了三个对象
+> - register 方法其实调用的是上面创建的读取器中的注册方法
+>   在这个方法里最终执行的是doRegisterBean会将配置类会被包装成beanDefinition
+>   然后注册到beanDefinitionMap中 到这里实际是没有创建bean的
+> - 最重要的是最后的refresh方法
+
+
+
 #### 如何理解Spring IOC
 
 
@@ -915,28 +1197,42 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 >    /** 一级缓存 Cache of singleton objects: bean name to bean instance. 
 >    用于存放完全初始化好的 bean，从该缓存中取出的 bean 可以直接使用 */
 >    private final Map<String, Object> singletonObjects = new ConcurrentHashMap<>(256);
->    
+>
 >    /** 二级缓存 Cache of early singleton objects: bean name to bean instance. 
 >    提前曝光的单例对象的cache，存放原始的 bean 对象（尚未填充属性），用于解决循环依赖 */
 >    private final Map<String, Object> earlySingletonObjects = new ConcurrentHashMap<>(16);
->    
+>
 >    /** 三级缓存 Cache of singleton factories: bean name to ObjectFactory. 
 >    单例对象工厂的cache，存放 bean 工厂对象，用于解决循环依赖 */
 >    private final Map<String, ObjectFactory<?>> singletonFactories = new HashMap<>(16);
->    
->    
+>    ~~~
+>
+>
 >    /** Names of beans that are currently in creation. */
 >    // 这个缓存也十分重要：它表示bean创建过程中都会在里面呆着~
 >    // 它在Bean开始创建时放值，创建完成时会将其移出~
 >    private final Set<String> singletonsCurrentlyInCreation = Collections.newSetFromMap(new ConcurrentHashMap<>(16));
->    
+>
 >    /** Names of beans that have already been created at least once. */
 >    // 当这个Bean被创建完成后，会标记为这个 注意：这里是set集合 不会重复
 >    // 至少被创建了一次的  都会放进这里~~~~
 >    private final Set<String> alreadyCreated = Collections.newSetFromMap(new ConcurrentHashMap<>(256));
->    
->    ~~~
 >
+>    ~~~
+> 
+>    ~~~
+
+
+
+#### 设计模式
+
+> 工厂模式：Spring中的 `BeanFactory` 或 `ApplicationContext` 通过bean信息创建bean对象
+>
+> 单例模式：Spring 通过 `ConcurrentHashMap` 实现单例注册表的特殊方式实现单例模式
+>
+> 代理模式：动态代理实现spring aop
+>
+> 观察者模式：spring的事件驱动模型
 
 
 
@@ -981,7 +1277,7 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 
 
 
-#### Spring AOP 和 AspectJ AOP 区别？
+#### Spring AOP 和 AspectJ AOP 区别
 
 > **Spring AOP 属于运行时增强，而 AspectJ 是编译时增强。** Spring AOP 基于代理(Proxying)，而 AspectJ 基于字节码操作(Bytecode Manipulation)。
 >
@@ -1036,6 +1332,12 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 > @ExceptionHandler：是异常处理器 可以捕获异常进行处理
 
 
+
+#### 过滤器和拦截器
+
+> 过滤器（Filter）：当你有一堆东西的时候，你只希望选择符合你要求的某一些东西。定义这些要求的工具，就是过滤器。
+>
+> 拦截器（Interceptor）：在一个流程正在进行的时候，你希望干预它的进展，甚至终止它进行，这是拦截器做的事情。
 
 
 
