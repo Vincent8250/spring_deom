@@ -1136,24 +1136,28 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 
 ## 面试题
 
-
+[参考文章](https://juejin.cn/post/6844904125721772039)
 
 ### 概念
 
-#### Spring,Spring MVC,Spring Boot 之间什么关系?
+#### Spring\Spring MVC\Spring Boot
 
-> 很多人对 Spring,Spring MVC,Spring Boot 这三者傻傻分不清楚！这里简单介绍一下这三者，其实很简单，没有什么高深的东西。
+> Spring 包含了多个功能模块 mvc只是其中一个模块
 >
-> Spring 包含了多个功能模块，其中最重要的是 Spring-Core（主要提供 IoC 依赖注入功能的支持） 模块， Spring 中的其他模块（比如 Spring MVC）的功能实现基本都需要依赖于该模块。
->
-> Spring MVC 是 Spring 中的一个很重要的模块，主要赋予 Spring 快速构建 MVC 架构的 Web 程序的能力。
-> MVC 是模型(Model)、视图(View)、控制器(Controller)的简写，其核心思想是通过将业务逻辑、数据、显示分离来组织代码。
->
-> 使用 Spring 进行开发各种配置过于麻烦比如开启某些 Spring 特性时，需要用 XML 或 Java 进行显式配置。于是，Spring Boot 诞生了！
->
-> Spring 旨在简化 J2EE 企业应用程序开发。**Spring Boot 旨在简化 Spring 开发**（减少配置文件，开箱即用！）。
->
-> Spring Boot 只是简化了配置，如果你需要构建 MVC 架构的 Web 程序，你还是需要使用 Spring MVC 作为 MVC 框架，只是说 Spring Boot 帮你简化了 Spring MVC 的很多配置，真正做到开箱即用！
+> Spring MVC 主要赋予 Spring 快速构建 MVC 架构的 Web 程序的能力
+>MVC 是模型、视图、控制器
+> 
+> Spring Boot 的目的只是简化配置
+>如果你需要构建 Web 程序 你还是需要使用 Spring MVC
+> 只是说 Spring Boot 帮你简化了 Spring MVC 的很多配置
+
+
+
+#### SpringBoot与SpringCloud
+
+> SpringBoot是快速开发的Spring框架，SpringCloud是完整的微服务框架，SpringCloud依赖于SpringBoot。
+
+
 
 
 
@@ -1390,7 +1394,20 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 
 ### Spring Boot
 
+
+
 #### Spring Boot 自动装配原理
+
+> 首先要理解自动装配的意思 并不是springioc的自动创建bean的意思
+> 虽然自动装配也是创建bean 两者的不同是在自动装配是通过ioc容器来进行的
+>
+> - springBoot的启动注解 @SpringBootApplication 里面最重要的注解就是@EnableAutoConfigration注解 它导入了一个选择器AutoConfigrationImportSelector
+>
+> - 这个选择器会扫描所有含有META-INF/spring.factories文件 然后将文件中@EnableAutoConfiguration对应的类注入到ioc容器中
+>
+> 这个过程就是自动装配的过程
+> 这里的难点在于容易跟spring的ioc弄混 都是注入bean
+> 自动装配是通过ioc来注入@EnableAutoConfiguration对应的类
 
 
 
@@ -1398,9 +1415,9 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 
 > 首先需要通过@SpringBootApplication进行注册 它由三个注解组成
 >
-> - @EnableAutoConfiguration（不做多余配置的话它可以替代@SpringBootApplication）
+> - @EnableAutoConfiguration
 >   它会导入自动配置=AutoConfigurationImportSelector
->   它会导入所有符合条件的@Configuration配置
+>   它会导入所有符合条件的@Configuration配置(EnableutoConfiguration下的)
 > - @SpringBootConfiguration = @Configuration 等价
 > - @ComponentScan 自动扫描 加载符合条件的bean
 >
@@ -1424,7 +1441,32 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 
 
 
+#### 日志框架
 
+> Spring Boot 默认使用 Logback 作为日志框架
+> Log4j2之类的也是可以支持的 引入依赖就可以了
+
+
+
+#### 服务容器
+
+> SpringBoot内置了 Tomcat/ Jetty 等容器
+
+
+
+#### SpringBoot事物的使用
+
+> 在Service方法上添加注解Transactional便可
+>
+>  注意：需要在启动类加入@EnableTransactionManagement使异步调用@Transactional注解生效
+
+
+
+#### Async异步调用方法
+
+> 使用@Async注解即可实现方法的异步调用
+>
+>  注意：需要在启动类加入@EnableAsync使异步调用@Async注解生效
 
 
 
@@ -1435,6 +1477,14 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 ### Spring Cloud
 
 
+
+#### bootstrap 和 application
+
+> - bootstrap：boostrap 由父 ApplicationContext 加载的，比 applicaton 优先加载，配置在应用程序上下文的引导阶段生效。一般来说我们在 Spring Cloud 配置就会使用这个文件。且 boostrap 里面的属性不能被覆盖；
+> - application： 由ApplicatonContext 加载，用于 spring boot 项目的自动化配置。
+>
+> 在springcloud项目中会有需要加载一些远程配置文件的时侯
+> 这时候可能会用到bootstarp
 
 
 
