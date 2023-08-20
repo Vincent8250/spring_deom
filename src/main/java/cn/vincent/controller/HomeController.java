@@ -56,4 +56,6 @@ public class HomeController {
         applicationContext.publishEvent(new MyEvent(this, "事件发布"));
     }
     //endregion
+
+
 }

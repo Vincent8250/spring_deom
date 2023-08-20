@@ -347,6 +347,8 @@ spring:
 
 `Spring默认使用singleton作用域`
 
+
+
 ### Bean注入
 
 | Annotaion    | Package                            | Source       |
@@ -357,6 +359,8 @@ spring:
 
 `Autowired` 默认的注入方式为`byType`
 `@Resource`默认注入方式为 `byName`
+
+
 
 ### 生命周期
 
@@ -375,6 +379,18 @@ spring:
 - 当要销毁 Bean 的时候，如果 Bean 在配置文件中的定义包含 destroy-method 属性，执行指定的方法。
 
 ![image-20230818172623879](spring.assets/image-20230818172623879.png)
+
+
+
+1. 首先通过BeanDefinitionMap实例化对象
+   循环definitionMap 通过反射获取到构造方法实例化对象
+2. 填充属性 通过三级缓存获取实例对象 完成属性填充
+   - 三级缓存：具体逻辑稍后讨论
+3. 属性填充后 
+
+
+
+![image-20230820193307563](spring.assets/image-20230820193307563.png)
 
 
 
@@ -1002,8 +1018,6 @@ public void preInstantiateSingletons() throws BeansException {
 
 
 
-
-
 ###### 12. finishRefresh()
 
 refresh做完之后需要做的其他事情
@@ -1029,11 +1043,31 @@ refresh是刷新 也是最核心的方法 包括BeanFactory、Bean、监听等�
 
 #### Bean 实例化
 
-createBeanInstance 
+Bean的实例化过程
+
+![image-20230820010932110](spring.assets/image-20230820010932110.png)
+
+1. 首先通过BeanDefinition读取器 读取出Bean信息
+   将BeanDefinition信息注册到BeanDefinitionMap中
+2. 在BeanDefinition信息注册后 可以通过实现BeanFactoryPostProcessor接口
+   在bean实例化之前对bean信息进行修改
+3. 通过BeanDefinitionMap和反射 实例化对象
+4. 通过三级缓存填充属性
+5. 检查Aware接口
+   实现 Aware 接口的目的是让程序可以拿到 Spring 容器的当前的运行环境
+   如当前 Bean 的名称、当前的 BeanFactory、当前的 ApplicationContext 等等资源
+6. 调用 beanPostProcessor 的前置处理器
+7. 执行@PostConstruct注解修饰的方法 PostConstruct 在构造函数之后执行
+8. Spring为bean提供了两种初始化bean的方式
+   - 实现接口InitializingBean的afterPropertiesSet方法 效率更高
+   - 指定init-method方法
+9. 最后调用 beanPostProcessor 的后置处理器
 
 
 
+Spring 扩展点执行顺序
 
+![image-20230820205448190](spring.assets/image-20230820205448190.png)
 
 
 
@@ -1137,7 +1171,7 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 > - register 方法其实调用的是上面创建的读取器中的注册方法
 >   在这个方法里最终执行的是doRegisterBean会将配置类会被包装成beanDefinition
 >   然后注册到beanDefinitionMap中 到这里实际是没有创建bean的
-> - 最重要的是最后的refresh方法
+> - 最重要的是最后的refresh方法 refresh
 
 
 
@@ -1146,6 +1180,16 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 
 
 #### 如理理解Spring AOP
+
+> 其实调试过代码都能看到 从容器中拿出来的对象已经不是原始对象了
+> 而是带有XXCGLib之类的后缀 这也就意味着容器中的对象是代理对象
+>
+> 而spring是利用了BeanPostProcessor来实现的
+> 只需要在创建对象后 创建出代理对象并注入到容器中就可以了
+>
+> DefaultAdvisorAutoProxyCreator
+>
+> ![image-20230820231125395](spring.assets/image-20230820231125395.png)
 
 
 
@@ -1205,22 +1249,21 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 >    /** 三级缓存 Cache of singleton factories: bean name to ObjectFactory. 
 >    单例对象工厂的cache，存放 bean 工厂对象，用于解决循环依赖 */
 >    private final Map<String, ObjectFactory<?>> singletonFactories = new HashMap<>(16);
->    ~~~
->
->
+>    
 >    /** Names of beans that are currently in creation. */
 >    // 这个缓存也十分重要：它表示bean创建过程中都会在里面呆着~
 >    // 它在Bean开始创建时放值，创建完成时会将其移出~
 >    private final Set<String> singletonsCurrentlyInCreation = Collections.newSetFromMap(new ConcurrentHashMap<>(16));
->
+>    
 >    /** Names of beans that have already been created at least once. */
 >    // 当这个Bean被创建完成后，会标记为这个 注意：这里是set集合 不会重复
 >    // 至少被创建了一次的  都会放进这里~~~~
 >    private final Set<String> alreadyCreated = Collections.newSetFromMap(new ConcurrentHashMap<>(256));
+>    ~~~
 >
->    ~~~
+>
 > 
->    ~~~
+>
 
 
 
@@ -1352,6 +1395,40 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 
 
 #### Spring Boot 启动流程
+
+> 首先需要通过@SpringBootApplication进行注册 它由三个注解组成
+>
+> - @EnableAutoConfiguration（不做多余配置的话它可以替代@SpringBootApplication）
+>   它会导入自动配置=AutoConfigurationImportSelector
+>   它会导入所有符合条件的@Configuration配置
+> - @SpringBootConfiguration = @Configuration 等价
+> - @ComponentScan 自动扫描 加载符合条件的bean
+>
+> 在注册完 run方法
+>
+> - 服务构建 构造方法
+>   - 首先初始化资源加载器
+>   - 然后设置web服务类型
+>   - 然后根据配置文件 META/spring.factories 加载初始化类
+>   - ![image-20230820215303602](spring.assets/image-20230820215303602.png)
+> - 环境准备 run方法
+>   - 配置环境
+>   - 启动监听
+>   - 加载系统配置（程序启动时传入的参数也是在这时加载进去）
+> - 容器创建
+>   - 创建bean工厂
+>   - 加载beanDefinitionMap
+> - 填充容器 自动装配 主要就是刷新容器的逻辑
+>   - 生命周期管理
+>   - 构建web服务器
+
+
+
+
+
+
+
+
 
 
 
