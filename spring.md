@@ -1071,6 +1071,41 @@ Spring 扩展点执行顺序
 
 
 
+### 三级缓存设计
+
+#### 一级缓存设计
+
+![image-20230821100200383](spring.assets/image-20230821100200383.png)
+
+一级缓存设计的缺点在于：不能保证所有的Bean都是完整的 有些正在创建的Bean
+不符合设计规范 缺乏安全性
+
+
+
+#### 二级缓存设计
+
+![image-20230821100345599](spring.assets/image-20230821100345599.png)
+
+二级缓存其实已经算是完美解决了依赖循环的问题
+
+但是在spring中依旧使用了三级缓存 是因为spring的aop设计导致的
+问题在于如果AB对象是需要代理的对象 那么A代理对象引用的还是B对象 B代理对象引用的还是A对象
+因为二级缓存不能将代理对象和原始对象分开 所以在spring的aop生成时会有问题
+如下图：
+![image-20230821101720814](spring.assets/image-20230821101720814.png)
+
+spring的代理设计导致二级缓存不能完成效果 这是由Bean的生命周期决定的（因为spring的代理实现在bean初始化之后 其实如果一开始创建的就是代理对象 那么就不会有这个问题 但是这违反了spring的设计原则）
+
+
+
+#### 三级缓存设计
+
+![image-20230821102101212](spring.assets/image-20230821102101212.png)
+
+三级缓存就能在不破坏bean生命周期的情况下完美解决依赖循环中代理对象的问题
+
+
+
 
 
 
@@ -1155,9 +1190,14 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 
 #### SpringBoot与SpringCloud
 
-> SpringBoot是快速开发的Spring框架，SpringCloud是完整的微服务框架，SpringCloud依赖于SpringBoot。
+> SpringBoot是快速开发的Spring框架 是单个个体服务
+> SpringCloud是完整的微服务框架 SpringCloud依赖于SpringBoot
 
 
+
+#### 什么是微服务
+
+> 按照业务逻辑将应用程序分割成多个应用服务 每个服务独立运行 服务之间通过RPC机制通讯
 
 
 
@@ -1181,6 +1221,11 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 
 #### 如何理解Spring IOC
 
+> spring中的ioc是依据di原则实现的一个ioc容器
+>
+> 目的是不让开发者直接创建对象 只是把对象声明出来就行 依赖上的解耦
+> 对象之间的依赖通过ioc容器来处理
+
 
 
 #### 如理理解Spring AOP
@@ -1199,6 +1244,8 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 
 #### 依赖循环
 
+> 参考IOC的三级缓存设计模块
+>
 > 1. Spring解决依赖循环的手段是：`通过三个Map组成的三级缓存 提前暴露未完成初始化的Bean`
 >
 > 2. `构造器循环依赖问题是无法解决的` 之所以构造器的循环依赖问题无法解决是因为：
@@ -1215,7 +1262,7 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 >
 >    - `createBeanInstance`：实例化，其实也就是调用对象的**构造方法**实例化对象
 >    - `populateBean`：填充属性，这一步主要是对bean的依赖属性进行注入(`@Autowired`)
->    - `initializeBean`：回到一些形如`initMethod`、`InitializingBean`等方法
+>    - `initializeBean`：会调`initMethod`、`InitializingBean`等方法
 >
 >    循环依赖主要发生在**第二步（populateBean）**
 >
@@ -1245,11 +1292,11 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 >    /** 一级缓存 Cache of singleton objects: bean name to bean instance. 
 >    用于存放完全初始化好的 bean，从该缓存中取出的 bean 可以直接使用 */
 >    private final Map<String, Object> singletonObjects = new ConcurrentHashMap<>(256);
->
+>    
 >    /** 二级缓存 Cache of early singleton objects: bean name to bean instance. 
 >    提前曝光的单例对象的cache，存放原始的 bean 对象（尚未填充属性），用于解决循环依赖 */
 >    private final Map<String, Object> earlySingletonObjects = new ConcurrentHashMap<>(16);
->
+>    
 >    /** 三级缓存 Cache of singleton factories: bean name to ObjectFactory. 
 >    单例对象工厂的cache，存放 bean 工厂对象，用于解决循环依赖 */
 >    private final Map<String, ObjectFactory<?>> singletonFactories = new HashMap<>(16);
@@ -1265,9 +1312,25 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 >    private final Set<String> alreadyCreated = Collections.newSetFromMap(new ConcurrentHashMap<>(256));
 >    ~~~
 >
+> 流程：A <--> B 相互依赖
 >
-> 
+> 1. 首先去一二三级缓存中查找是否有A对象 如果没有就实例化A对象
+> 2. 实例化后 判断A对象能否提前暴露 可以的话就放到三级缓存中
+>    需要注意的是三级缓存中存放的不是对象本身 而是对象工厂
+>    之所以是对象工厂 是为了生成代理
+> 3. 然后A对象填充属性 发现需要B对象 先去一二三级缓存中查找
+> 4. 没有就实例化B对象 然后在三级缓存中存放B对象的对象工厂
+> 5. 然后B对象填充属性 发现需要A对象 然后在三级缓存中找到
+>    三级缓存中的对象工厂会返回一个A对象或者A的代理对象
+>    并把对象放到二级缓存中删除二三级缓存中的对象工厂
+> 6. B对象拿到一个不完整的A对象 完成属性填充 然后进行初始化
+>    初始化完成后 把B对象放到一级缓存中 删除二三级缓存中的B对象
+> 7. B对象完成初始化后 A对象也可以依据一级缓存中的B对象完成属性填充
+>    A对象初始化后 删除二三级缓存中的A对象
 >
+> - 一级缓存中存放的是完整Bean对象
+> - 二级缓存中存放的是提前暴露的不完整的Bean对象
+> - 三级缓存中存放的是对象工厂 
 
 
 
@@ -1331,6 +1394,25 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 > Spring AOP 已经集成了 AspectJ ，AspectJ 应该算的上是 Java 生态系统中最完整的 AOP 框架了。AspectJ 相比于 Spring AOP 功能更加强大，但是 Spring AOP 相对来说更简单，
 >
 > 如果我们的切面比较少，那么两者性能差异不大。但是，当切面太多的话，最好选择 AspectJ ，它比 Spring AOP 快很多。
+
+
+
+#### BeanFactory 和 ApplicationContext
+
+> ApplicationContext是BeanFactory的子接口
+>
+> - BeanFactory：是Spring里面最底层的接口，包含了各种Bean的定义，读取bean配置文档，管理bean的加载、实例化，控制bean的生命周期，维护bean之间的依赖关系。
+> - ApplicationContext：ApplicationContext在BeanFactory基础之上 提供了很多附加功能
+>   - 比如监听注册bean的事件
+>   - 加载多个配置文件
+>   - ...
+>
+> 在我看来最大的区别是两个容器加载bean的区别
+>
+> - beanFatory 是延迟加载 用到这个bean的时候才加载
+> - applicationContext 则是在启动的时候就全加载
+>
+> 推荐使用applicationContext 唯一的不足就是内存占用会比较大
 
 
 
@@ -1476,9 +1558,50 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 
 ### Spring Cloud
 
+#### 概念
+
+##### 优点 缺点
+
+> 优点：
+>
+> 1. **耦合度比较低** 不会影响其他模块的开发。
+> 2. 减轻团队的成本，**可以并行开发**，不用关注其他人怎么开发，先关注自己的开发。   
+>
+> 缺点：
+>
+> 1. 部署比较麻烦
+> 2. 数据管理比麻烦 因为基本都是多数据库
+> 3. 性能的监控比较麻烦
 
 
-#### bootstrap 和 application
+
+##### CAP理论
+
+> C：一致性 所有节点在同一时间具有相同的数据
+>
+> A：可用性 服务的可用性
+>
+> P：分区容忍性 这里的分区指的是网络意义上的分区。由于网络是不可靠的，所有节点之间很可能出现无法通讯的情况，在节点不能通信时，要保证系统可以继续正常服务。
+>
+> P是一定存在的 CAP只能达到CP或者AP
+> **理解CAP理论的最简单方式：**可以想象两个节点分处在分区两侧。允许至少一个节点更新状态会导致数据的不一致，即丧失了C性质。如果为了保证数据一致性，将分区一侧的节点设置为不可用，那么又丧失了A性质。除非两个节点互相通信，才能既保证C又保证A，这又会导致丧失P性质。
+
+
+
+##### 组成部分
+
+> 服务注册与发现：Spring Cloud Eureka || Nacos
+> 服务网关：Spring Cloud Zuul || gateWay
+> 负载均衡：Spring Cloud Ribbon
+> 声明性的Web服务客户端：Spring Cloud OpenFeign
+> 熔断降级：Spring Cloud Hystrix || sentinel
+> 配置管理：Spring Cloud Config || Nacos
+> 分布式事务：seata
+> 消息中间件：RocketMQ
+
+
+
+##### bootstrap 和 application
 
 > - bootstrap：boostrap 由父 ApplicationContext 加载的，比 applicaton 优先加载，配置在应用程序上下文的引导阶段生效。一般来说我们在 Spring Cloud 配置就会使用这个文件。且 boostrap 里面的属性不能被覆盖；
 > - application： 由ApplicatonContext 加载，用于 spring boot 项目的自动化配置。
@@ -1488,6 +1611,143 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 
 
 
+#### Nacos
+
+##### 核心功能
+
+> - 服务注册：Nacos Client会通过发送REST请求的方式向Nacos Server注册自己的服务，提供自身的元数据，比如ip地址、端口等信息。Nacos Server接收到注册请求后，就会把这些元数据信息存储在一个双层的内存Map中。
+> - 服务心跳：在服务注册后，Nacos Client会维护一个定时心跳来持续通知Nacos Server，说明服务一直处于可用状态，防止被剔除。默认5s发送一次心跳。
+> - 服务同步：Nacos Server集群之间会互相同步服务实例，用来保证服务信息的一致性。
+> - 服务发现：服务消费者（Nacos Client）在调用服务提供者的服务时，会发送一个REST请求给Nacos Server，获取上面注册的服务清单，并且缓存在Nacos Client本地，同时会在Nacos Client本地开启一个定时任务定时拉取服务端最新的注册表信息更新到本地缓存。
+> - 服务健康检查：Nacos Server会开启一个定时任务用来检查注册服务实例的健康情况，对于超过15s没有收到客户端心跳的实例会将它的healthy属性置为false(客户端服务发现时不会发现)，如果某个实例超过30秒没有收到心跳，直接剔除该实例(被剔除的实例如果恢复发送心跳则会重新注册)
+
+##### 如何判定服务实例的状态
+
+通过发送心跳包，5秒发送一次，如果15秒没有回应，则说明服务出现了问题，
+如果30秒后没有回应，则说明服务已经停止。
+
+
+
+#### Ribbon
+
+##### 作用
+
+> ribbon的作用就是根据指定的算法 比如轮询或者权重 指定服务实例
+
+##### Ribbon 和 Nginx
+
+> Nginx是反向代理同时可以实现负载均衡 
+> Nginx相当于拦截请求 根据配置进行转发
+>
+> Ribbon是客户端负载均衡 不会转发 一切都在客户端操作
+
+
+
+#### Fegin
+
+Feign 是一个声明web服务客户端 有的人说是伪RPC因为它是用的Http协议的 但feign就是RPC
+利用 Feign 我们可以将调用的服务方法定义成抽象方法保存在本地
+在调用远程方法的时候就不需要自己构建Http请求了 直接调用接口就行了
+
+feign的底层是通过动态代理实现的
+
+
+
+#### Sentinel
+
+##### 概念
+
+Sentinel是阿里开源的项目 提供了流量控制、熔断降级、系统负载保护等多个维度来保障服务之间的稳定性
+
+Sentinel 分为两个部分:
+
+- 核心库（Java 客户端）不依赖任何框架/库，能够运行于所有 Java 运行时环境，同时对 Dubbo / Spring Cloud 等框架也有较好的支持。
+- 控制台（Dashboard）基于 Spring Boot 开发，打包后可以直接运行，不需要额外的 Tomcat 等应用容器。
+
+可以直接针对系统进行限流 控制台有个系统规则的功能 可以针对整个系统进行限流
+
+
+
+##### 使用
+
+1. 定义资源
+
+   > 资源：可以是任何东西 一个服务、服务里的方法、甚至是一段代码
+   > sentinel中资源定义有两种方法：
+   >
+   > - SphU.entry("资源名") 和 entry.exit() 包围起来即可
+   > - @SentinelResource
+
+2. 定义规则
+
+   > 规则：Sentinel 支持以下几种规则：流量控制规则、熔断降级规则、系统保护规则、来源访问控制规则 和 热点参数规则
+   > sentinel中定义规则有两种方法：
+   >
+   > - 控制台配置
+   > - 硬编码
+
+3. 检验规则是否生效
+
+
+
+##### @SentinelResource 
+
+```java
+@SentinelResource(value = "getUserName", blockHandler = "blockException")
+```
+
+参数：
+
+- value：资源名称
+- blockHandler： BlockException 异常的处理函数
+  blockHandler 函数访问范围需要是 public 返回类型需要与原方法相匹配
+  参数类型需要和原方法相匹配并且最后加一个额外的参数 类型为 BlockException
+- entryType：entry 类型，可选项（默认为 EntryType.OUT）
+- blockHandlerClass：blockHandler 函数默认需要和原方法在同一个类中 如果希望使用其他类的函数
+  则需要指定 blockHandlerClass 为对应的类的 Class 对象 注意对应的函数必需为**静态函数** 否则无法解析
+- fallback：异常处理方法（这个就是单纯的异常处理 针对所有异常）
+- fallbackClass：效果等同于blockHandlerClass
+- exceptionsToIgnore：配合fallback使用 排除异常
+
+
+
+##### 流控
+
+###### 流控效果
+
+- 快速失败
+  默认的流量控制方式，当QPS超过任意规则的阈值后，新的请求就会被立即拒绝
+
+- warm up
+  即**预热/冷启动**方式：当系统长期处于低水位的情况下 当流量突然增加时 直接把系统拉升到高水位可能瞬间把系统压垮
+  通过"冷启动"，让通过的流量缓慢增加，在一定时间内逐渐增加到阈值上限，给冷系统一个预热的时间，避免冷系统被压垮
+
+- 排队等待
+
+  匀速排队方式会严格控制请求通过的间隔时间 也即是让请求以均匀的速度通过
+
+###### 流控模式
+
+- 直接拒绝：接口达到限流条件时，直接限流
+- 关联：当关联的资源达到阈值时，就限流自己
+- 链路：只记录指定链路上的流量（指定资源从入口资源进来的流量，如果达到阈值，就可以限流）
+
+###### 两种统计类型
+
+流控分为两种统计类型
+QPS：每秒请求数 即在不断向服务器发送请求的情况下 服务器每秒能够处理的请求数量
+并发线程数：指的是施压机施加的同时请求的线程数量
+
+
+
+##### 降级
+
+###### 三种熔断策略
+
+- 平均响应时间：当 1s 内持续进入 5 个请求，对应时刻的平均响应时间（秒级）均超过阈值（count，以 ms 为单位），那么在接下的时间窗口（DegradeRule 中的 timeWindow，以 s 为单位）之内，对这个方法的调用都会自动地熔断（抛出 DegradeException）。
+  注意 Sentinel 默认统计的 RT 上限是 4900 ms，超出此阈值的都会算作 4900 ms，若需要变更此上限可以通过启动配置项 -Dcsp.sentinel.statistic.max.rt=xxx 来配置。
+- 异常比例：当资源的每秒请求量 >= 5，并且每秒异常总数占通过量的比值超过阈值（DegradeRule 中的 count）之后，资源进入降级状态，即在接下的时间窗口（DegradeRule 中的 timeWindow，以 s 为单位）之内，对这个方法的调用都会自动地返回。异常比率的阈值范围是 [0.0, 1.0]，代表 0% - 100%。
+- 异常数：当资源近 1 分钟的异常数目超过阈值之后会进行熔断。注意由于统计时间窗口是分钟级别的，若 timeWindow 小于 60s，则结束熔断状态后仍可能再进入熔断状态。
 
 
 
@@ -1495,8 +1755,25 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 
 
 
+#### Seata
+
+参看seata项目文档
 
 
 
+#### Gateway
 
+SpringCloud Gateway 是 Spring Cloud 的一个全新项目，它旨在为微服务架构提供一种简单有效的统一的 API 路由管理方式。**Spring Cloud Gateway 底层使用了高性能的通信框架Netty。**
+
+- 动态路由、灰度发布、健康检查
+- 限流、熔断
+- 认证: 如数支持 HMAC, JWT, Basic, OAuth 2.0 等常用协议
+- 鉴权: 权限控制，IP 黑白名单，同样是 OpenResty 的特性
+- 可用性、高性能
+
+
+
+#### RocketMQ
+
+##### 消息零丢失
 
