@@ -1523,6 +1523,13 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 
 
 
+#### 内部Tomcat
+
+> springboot启动的时候会自动导入tomcat的相关类
+> 然后在自动配置的阶段 会通过Servlet容器工厂来判断你需要启动的是一个什么样的web容器
+
+
+
 #### 日志框架
 
 > Spring Boot 默认使用 Logback 作为日志框架
